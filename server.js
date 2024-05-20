@@ -1,19 +1,66 @@
 const express = require('express')
+const multer = require("multer")
+const crypto = require("node:crypto")
 
 const { connectToDb } = require('./lib/mongo')
-const { getImageInfoById } = require('./models/image')
+const { getImageInfoById, saveImageInfo } = require('./models/image')
 
 const app = express()
 const port = process.env.PORT || 8000
+
+const imageTypes = {
+    "image/jpeg": "jpg",
+    "image/png": "png",
+    "image/gif": "gif"
+}
+
+const upload = multer({
+    storage: multer.diskStorage({
+        destination: `${__dirname}/uploads`,
+        filename: (req, file, callback) => {
+            const filename = crypto.pseudoRandomBytes(16).toString("hex")
+            const extension = imageTypes[file.mimetype]
+            callback(null, `${filename}.${extension}`)
+        },
+        fileFilter: (req, file, callback) => {
+            callback(null, !!imageTypes[file.mimetype])
+        }
+    }),
+})
 
 app.get('/', (req, res, next) => {
     res.status(200).sendFile(__dirname + '/index.html')
 })
 
+app.use("/media/images", express.static(`${__dirname}/uploads`))
+
+app.post(
+    "/images",
+    upload.single("image"),
+    async (req, res, next) => {
+        console.log("== req.file:", req.file)
+        console.log("== req.body:", req.body)
+        if (req.file && req.body && req.body.userId) {
+            const id = await saveImageInfo({
+                userId: req.body.userId,
+                filename: req.file.filename,
+                path: req.file.path,
+                contentType: req.file.mimetype
+            })
+            res.status(200).send({ id: id })
+        } else {
+            res.status(400).send({
+                error: "Request needs 'image' and 'userId'."
+            })
+        }
+    }
+)
+
 app.get('/images/:id', async (req, res, next) => {
     try {
         const image = await getImageInfoById(req.params.id)
         if (image) {
+            image.url = `/media/images/${image.filename}`
             res.status(200).send(image)
         } else {
             next()
