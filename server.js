@@ -21,11 +21,11 @@ const upload = multer({
             const filename = crypto.pseudoRandomBytes(16).toString("hex")
             const extension = imageTypes[file.mimetype]
             callback(null, `${filename}.${extension}`)
-        },
-        fileFilter: (req, file, callback) => {
-            callback(null, !!imageTypes[file.mimetype])
         }
     }),
+    fileFilter: (req, file, callback) => {
+        callback(null, !!imageTypes[file.mimetype])
+    }
 })
 
 app.get('/', (req, res, next) => {
